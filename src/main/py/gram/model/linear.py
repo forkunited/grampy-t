@@ -38,6 +38,8 @@ class LinearModel(nn.Module):
         self._linear = nn.Linear(self._input_size, self._output_size, bias=bias)
         if init_params is not None:
             self._linear.weight = nn.Parameter(init_params.unsqueeze(0))
+        else:
+            self._linear.weight = nn.Parameter(torch.zeros(1,self._input_size))
 
     def get_name(self):
         return self._name

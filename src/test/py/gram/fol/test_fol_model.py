@@ -14,11 +14,15 @@ from mung.fol.rule_form_indicator import UnaryRule
 from mung.fol.feature_top import FeatureTopType
 from mung.fol.feature_form_indicator import FeatureFormIndicatorType
 from gram.model.linear import LinearRegression, LogisticRegression, DataParameter
+from gram.model.grammar import LinearGrammarRegression, LogisticGrammarRegression 
 
-TRAINING_ITERATIONS = 750 #1500
+TRAINING_ITERATIONS = 3000 #1500
 DATA_SIZE = 3000
 LOG_INTERVAL = 250
 BATCH_SIZE = 100
+GRAMMAR_T = 0.0
+L1_C = 0.5
+LEARNING_RATE = 1.0
 
 # FIXME Add back if using gpus
 #if gpu:
@@ -30,6 +34,8 @@ np.random.seed(1)
 class ModelType:
     LINEAR_REGRESSION = 0
     LOGISTIC_REGRESSION = 1
+    LINEMAR_GRAMRESSION = 2
+    LOGISTMAR_GRAMRESSION = 3
 
 class TestFOLModel(unittest.TestCase):
 
@@ -82,13 +88,10 @@ class TestFOLModel(unittest.TestCase):
 
         w_params = torch.FloatTensor(w)
         model_true = None
-        modell1 = None
-        if model_type == ModelType.LINEAR_REGRESSION:
+        if model_type == ModelType.LINEAR_REGRESSION or model_type == ModelType.LINEMAR_GRAMRESSION:
             model_true = LinearRegression("linear_true", w_params.size(0), init_params=w_params)
-            modell1 = LinearRegression("linear_regression", F_full.get_size(), bias=True)
         else:
             model_true = LogisticRegression("logistic_true", w_params.size(0), init_params=w_params)
-            modell1 = LogisticRegression("logistic_regression", F_full.get_size(), bias=True)
 
         def label_fn(d): 
             D = data.DataSet(data=[d])
@@ -108,12 +111,38 @@ class TestFOLModel(unittest.TestCase):
 
         M_train_x = feat.DataFeatureMatrix(D_unfeat_train, F_full)
         M_train_y = feat.DataFeatureMatrix(D_unfeat_train, F_label)
-        D_train = feat.MultiviewDataSet(data=D_unfeat_train, dfmats={ data_parameters[DataParameter.INPUT] : M_train_x, data_parameters[DataParameter.OUTPUT] : M_train_y })
+        D_train_full = feat.MultiviewDataSet(data=D_unfeat_train, dfmats={ data_parameters[DataParameter.INPUT] : M_train_x, data_parameters[DataParameter.OUTPUT] : M_train_y })
+
+        M_train_x_0 = feat.DataFeatureMatrix(D_unfeat_train, F_0)
+        D_train_0 = feat.MultiviewDataSet(data=D_unfeat_train, dfmats={ data_parameters[DataParameter.INPUT] : M_train_x_0, data_parameters[DataParameter.OUTPUT] : M_train_y })
 
         M_dev_x = feat.DataFeatureMatrix(D_unfeat_dev, F_full)
         M_dev_y = feat.DataFeatureMatrix(D_unfeat_dev, F_label)
-        D_dev = feat.MultiviewDataSet(data=D_unfeat_dev, dfmats={ data_parameters[DataParameter.INPUT] : M_dev_x, data_parameters[DataParameter.OUTPUT] : M_dev_y })
-       
+        D_dev_full = feat.MultiviewDataSet(data=D_unfeat_dev, dfmats={ data_parameters[DataParameter.INPUT] : M_dev_x, data_parameters[DataParameter.OUTPUT] : M_dev_y })
+
+        M_dev_x_0 = feat.DataFeatureMatrix(D_unfeat_dev, F_0)
+        D_dev_0 = feat.MultiviewDataSet(data=D_unfeat_dev, dfmats={ data_parameters[DataParameter.INPUT] : M_dev_x_0, data_parameters[DataParameter.OUTPUT] : M_dev_y })
+
+        modell1 = None
+        D_train = None
+        D_dev = None
+        if model_type == ModelType.LINEAR_REGRESSION:
+            modell1 = LinearRegression("linear_regression", F_full.get_size(), bias=True)
+            D_train = D_train_full
+            D_dev = D_dev_full
+        elif model_type == ModelType.LOGISTIC_REGRESSION:
+            modell1 = LogisticRegression("logistic_regression", F_full.get_size(), bias=True)
+            D_train = D_train_full
+            D_dev = D_dev_full
+        elif model_type == ModelType.LINEMAR_GRAMRESSION:
+            modell1 = LinearGrammarRegression("linemar_gramression", [D_train_0, D_dev_0], F_0.get_size(), F_full.get_size(), R, GRAMMAR_T, bias=True, max_expand_unary=None, max_expand_binary=None)
+            D_train = D_train_0
+            D_dev = D_dev_0
+        elif model_type == ModelType.LOGISTMAR_GRAMRESSION:
+            modell1 = LogisticGrammarRegression("logistmar_gramression", [D_train_0, D_dev_0], F_0.get_size(), F_full.get_size(), R, GRAMMAR_T, bias=True, max_expand_unary=None, max_expand_binary=None)
+            D_train = D_train_0
+            D_dev = D_dev_0 
+
         logger = Logger()
         loss_criterion = modell1.get_loss_criterion()
         dev_loss = Loss("loss", D_dev, data_parameters, loss_criterion)
@@ -122,7 +151,6 @@ class TestFOLModel(unittest.TestCase):
         modell1, best_meaning, best_iteration = trainer.train(modell1, D_train, TRAINING_ITERATIONS, \
             batch_size=BATCH_SIZE, optimizer_type=OptimizerType.ADAGRAD_MUNG, lr=lr, \
             grad_clip=5.0, log_interval=LOG_INTERVAL, best_part_fn=None, l1_C=l1_C)
-
 
         # FIXME
         #modell1 = model_linear.PredictionModel.make(model_type)
@@ -133,15 +161,18 @@ class TestFOLModel(unittest.TestCase):
         #l1_g_hist = modell1_g.train_l1_g(D, F_0, R, t=0.04, iterations=140001, C=8.0, eta_0=eta_0, alpha=0.8, evaluation_fn=eval_dev)
 
         print "True model"
-        print model_true.get_weights()
+        w_true = model_true.get_weights()
+        for i in range(F_relevant.get_size()):
+            print str(F_relevant.get_feature_token(i)) + "\t" + str(w_true[i])
+        print "\n"
 
         print "l1 model"
+        w_model = modell1.get_weights()
+        F_train = D_train[data_parameters[DataParameter.INPUT]].get_feature_set()
         print "Bias: " + str(modell1.get_bias())
-        print modell1.get_weights()
-
-        # FIXME
-        #print "l1-g model"
-        #print str(modell1_g)
+        for i in range(F_train.get_size()):
+            print str(F_train.get_feature_token(i)) + "\t" + str(w_model[i])
+        print "\n"
 
         #print "l1 histories"
         #self._print_table(l1_hist, "losses")
@@ -155,19 +186,23 @@ class TestFOLModel(unittest.TestCase):
         # self._print_table(l1_g_hist, "nzs")
         # self._print_table(l1_g_hist, "vals")
 
-
+ 
     def test_linear(self):
         print "Linear regression..."
-        l1_C = 0.2
-        lr = 1.0
-        self._test_model(ModelType.LINEAR_REGRESSION, lr=lr, l1_C=l1_C)
-
-    def test_log_linear(self):
+        self._test_model(ModelType.LINEAR_REGRESSION, lr=LEARNING_RATE, l1_C=L1_C)
+    """
+    def test_logistic(self):
         print "Logistic regression..."
-        l1_C = 0.2 #0.001
-        lr = 1.0
-        self._test_model(ModelType.LOGISTIC_REGRESSION, lr=lr, l1_C=l1_C)
-
+        self._test_model(ModelType.LOGISTIC_REGRESSION, lr=LEARNING_RATE, l1_C=L1_C)
+    """
+    def test_linear_g(self):
+        print "Linemar gramression..."
+        self._test_model(ModelType.LINEMAR_GRAMRESSION, lr=LEARNING_RATE, l1_C=L1_C)
+    """
+    def test_logistic_g(self):
+        print "Logistmar gramression..."
+        self._test_model(ModelType.LOGISTMAR_GRAMRESSION, lr=LEARNING_RATE, l1_C=L1_C)
+    """    
 if __name__ == '__main__':
     unittest.main()
 
