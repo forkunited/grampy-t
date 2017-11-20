@@ -6,7 +6,7 @@ import torch
 import mung.fol.data as data
 import mung.feature as feat
 import mung.rule as rule
-from mung.torch_ext.eval import Loss 
+from mung.torch_ext.eval import Loss
 from mung.torch_ext.learn import OptimizerType, Trainer
 from mung.util.log import Logger
 from mung.fol.rule_form_indicator import BinaryRule
@@ -14,7 +14,7 @@ from mung.fol.rule_form_indicator import UnaryRule
 from mung.fol.feature_top import FeatureTopType
 from mung.fol.feature_form_indicator import FeatureFormIndicatorType
 from gram.model.linear import LinearRegression, LogisticRegression, DataParameter
-from gram.model.grammar import LinearGrammarRegression, LogisticGrammarRegression 
+from gram.model.grammar import LinearGrammarRegression, LogisticGrammarRegression
 
 TRAINING_ITERATIONS = 3000 #1500
 DATA_SIZE = 3000
@@ -53,7 +53,7 @@ class TestFOLModel(unittest.TestCase):
         w = []
         R = rule.RuleSet()
 
-         
+
         feature = FeatureTopType("T")
         #F_full.add_feature_type(feature)
         F_relevant.add_feature_type(feature)
@@ -66,8 +66,8 @@ class TestFOLModel(unittest.TestCase):
 
             form = data.OpenFormula(domain, prop + "(x)", ["x"])
             feature = FeatureFormIndicatorType(prop, form)
-            F_full.add_feature_type(feature)            
-            
+            F_full.add_feature_type(feature)
+
             token_relevant = feature.get_token(0)
             form_relevant = data.OpenFormula(domain, prop + "(x)", ["x"], init_g=token_relevant.get_closed_form().get_g())
             feature_relevant = FeatureFormIndicatorType(prop, form_relevant)
@@ -93,7 +93,7 @@ class TestFOLModel(unittest.TestCase):
         else:
             model_true = LogisticRegression("logistic_true", w_params.size(0), init_params=w_params)
 
-        def label_fn(d): 
+        def label_fn(d):
             D = data.DataSet(data=[d])
             fmat = feat.DataFeatureMatrix(D, F_relevant)
             return model_true.predict(dict({ data_parameters[DataParameter.INPUT] : fmat.get_batch(0,1) }), data_parameters, rand=True)[0,0].data[0]
@@ -141,7 +141,7 @@ class TestFOLModel(unittest.TestCase):
         elif model_type == ModelType.LOGISTMAR_GRAMRESSION:
             modell1 = LogisticGrammarRegression("logistmar_gramression", [D_train_0, D_dev_0], F_0.get_size(), F_full.get_size(), R, GRAMMAR_T, bias=True, max_expand_unary=None, max_expand_binary=None)
             D_train = D_train_0
-            D_dev = D_dev_0 
+            D_dev = D_dev_0
 
         logger = Logger()
         loss_criterion = modell1.get_loss_criterion()
@@ -186,7 +186,7 @@ class TestFOLModel(unittest.TestCase):
         # self._print_table(l1_g_hist, "nzs")
         # self._print_table(l1_g_hist, "vals")
 
- 
+
     def test_linear(self):
         print "Linear regression..."
         self._test_model(ModelType.LINEAR_REGRESSION, lr=LEARNING_RATE, l1_C=L1_C)
@@ -202,7 +202,6 @@ class TestFOLModel(unittest.TestCase):
     def test_logistic_g(self):
         print "Logistmar gramression..."
         self._test_model(ModelType.LOGISTMAR_GRAMRESSION, lr=LEARNING_RATE, l1_C=L1_C)
-    """    
+    """
 if __name__ == '__main__':
     unittest.main()
-
