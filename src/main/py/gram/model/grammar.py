@@ -39,7 +39,7 @@ class MaskedLinear(nn.Module):
 
     def set_weights(self, weights, biases, new_weights_mask):
         self._linear.weight.data *= (1.0 - new_weights_mask.unsqueeze(1))
-        self._linear.weight.data += new_weights_mask.unsqueeze(1) * weights.transpose(0,1).data    
+        self._linear.weight.data += new_weights_mask.unsqueeze(1) * weights.transpose(0,1).data
         self._linear.bias.data *= (1.0 - new_weights_mask)
         self._linear.bias.data += new_weights_mask * biases.data
 
@@ -47,8 +47,9 @@ class MaskedLinear(nn.Module):
         return next(self.parameters()).is_cuda
 
 class ArchitectureGrammar:
-    LAYER = 0
-    TREE = 1
+    NONE = "None"
+    LAYER = "Layer"
+    TREE = "Tree"
 
 class FeatureNode:
     def __init__(self, children=[], weights=None, bias=0.0, feature_name=None):
@@ -89,7 +90,7 @@ class FeatureNode:
                 child_values[i] = self._children[i].get_min_value()
         return child_values
 
-    # Compute the operator based on the smallest number of children that must be "on" 
+    # Compute the operator based on the smallest number of children that must be "on"
     # (after negation) for this unit to be "on" on average.  If more than
     # half must be on, return '&" and the number of children necessary.  Else return
     # '|' and the number of children necessary
@@ -385,7 +386,7 @@ class GrammarModel(nn.Module):
                 #init_tree_weights *= self._arch_layers[i].get_mask().data
                 #self._arch_layers[i].set_weights(Variable(init_tree_weights), Variable(self._linear.bias.data.clone().repeat(pairs_mask_i.size(0))), new_pairs_mask_i.float())
 
-                added += torch.sum(new_pairs_mask_i)        
+                added += torch.sum(new_pairs_mask_i)
                 self._grammar_masks[i][0] = self._grammar_masks[i][0] | pairs_mask_i
                 self._expanded_arch[indices_i] = 1.0
                 layer_max += self._grammar_masks[i].size(1)
@@ -443,7 +444,7 @@ class GrammarModel(nn.Module):
             return self._linear(linear_input)
 
     def forward_batch(self, batch, data_parameters):
-        if self.training and (self._extend_interval is None or self._opt is None 
+        if self.training and (self._extend_interval is None or self._opt is None
             or self._opt.get_step() % self._extend_interval == 0):
             added = self._extend_model(data_parameters)
             if added > 0:
@@ -496,7 +497,7 @@ class GrammarModel(nn.Module):
                 index_in_layer = index - (next_layer_index - cur_layer_size)
                 f_weights = layer.get_weights().data[index_in_layer].squeeze()
                 layer_child_indices = torch.nonzero(f_weights).squeeze()
-                
+
                 if len(layer_child_indices.size()) == 0:
                     bias = layer.get_bias().data[index_in_layer]
                     feat = FeatureNode(feature_name="B(" + str(bias) + ")")
