@@ -196,5 +196,3 @@ class TestFOLArchitecture(unittest.TestCase):
     def test_tree_architecture(self):
         self._test_arch(ArchitectureGrammar.TREE, lr=LEARNING_RATE, l1_C=L1_C)
 
-if __name__ == '__main__':
-    unittest.main()

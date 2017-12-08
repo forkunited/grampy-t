@@ -16,12 +16,12 @@ from mung.fol.feature_form_indicator import FeatureFormIndicatorType
 from gram.model.linear import LinearRegression, LogisticRegression, DataParameter
 from gram.model.grammar import LinearGrammarRegression, LogisticGrammarRegression
 
-TRAINING_ITERATIONS = 3000 #1500
+TRAINING_ITERATIONS = 750 #1500
 DATA_SIZE = 3000
-LOG_INTERVAL = 250
+LOG_INTERVAL = 5
 BATCH_SIZE = 100
-GRAMMAR_T = 0.0
-L1_C = 0.5
+GRAMMAR_T = 0.05
+L1_C = 0.4
 LEARNING_RATE = 1.0
 
 # FIXME Add back if using gpus
@@ -152,14 +152,6 @@ class TestFOLModel(unittest.TestCase):
             batch_size=BATCH_SIZE, optimizer_type=OptimizerType.ADAGRAD_MUNG, lr=lr, \
             grad_clip=5.0, log_interval=LOG_INTERVAL, best_part_fn=None, l1_C=l1_C)
 
-        # FIXME
-        #modell1 = model_linear.PredictionModel.make(model_type)
-        #l1_hist = modell1.train_l1(D, F_full, iterations=140001, C=16.0, eta_0=eta_0, alpha=0.8, evaluation_fn=eval_dev)
-
-        # FIXME
-        #modell1_g = model_linear.PredictionModel.make(model_type)
-        #l1_g_hist = modell1_g.train_l1_g(D, F_0, R, t=0.04, iterations=140001, C=8.0, eta_0=eta_0, alpha=0.8, evaluation_fn=eval_dev)
-
         print "True model"
         w_true = model_true.get_weights()
         for i in range(F_relevant.get_size()):
@@ -174,19 +166,10 @@ class TestFOLModel(unittest.TestCase):
             print str(F_train.get_feature_token(i)) + "\t" + str(w_model[i])
         print "\n"
 
-        #print "l1 histories"
-        #self._print_table(l1_hist, "losses")
-        #self._print_table(l1_hist, "l1s")
-        #self._print_table(l1_hist, "nzs")
-        #self._print_table(l1_hist, "vals")
+        logger.set_file_path("out_" + str(model_type) + ".tsv")
+        logger.dump()
 
-        # print "l1-g histories"
-        # self._print_table(l1_g_hist, "losses")
-        # self._print_table(l1_g_hist, "l1s")
-        # self._print_table(l1_g_hist, "nzs")
-        # self._print_table(l1_g_hist, "vals")
-
-
+    """
     def test_linear(self):
         print "Linear regression..."
         self._test_model(ModelType.LINEAR_REGRESSION, lr=LEARNING_RATE, l1_C=L1_C)
@@ -202,6 +185,6 @@ class TestFOLModel(unittest.TestCase):
     def test_logistic_g(self):
         print "Logistmar gramression..."
         self._test_model(ModelType.LOGISTMAR_GRAMRESSION, lr=LEARNING_RATE, l1_C=L1_C)
-    """
+
 if __name__ == '__main__':
     unittest.main()

@@ -9,3 +9,4 @@ python ${TEST_DIR}/test_fol_rep.py
 #python ${TEST_DIR}/test_fol_data.py
 #python ${TEST_DIR}/test_fol_rules.py
 #python ${TEST_DIR}/test_fol_model.py
+#python ${TEST_DIR}/test_fol_arch.py

@@ -74,16 +74,17 @@ class LinearModel(nn.Module):
         return loss_criterion(model_out, Variable(output))
 
 class LinearRegression(LinearModel):
-    def __init__(self, name, input_size, init_params=None, bias=False):
+    def __init__(self, name, input_size, init_params=None, bias=False, std=1.0):
         super(LinearRegression, self).__init__(name, input_size, init_params=init_params, bias=bias)
         self._mseloss = nn.MSELoss(size_average=False)
+        self._std = std
 
     def predict(self, batch, data_parameters, rand=False):
         if not rand:
             return self.forward_batch(batch, data_parameters)
         else:
             mu = self.forward_batch(batch, data_parameters)
-            return torch.normal(mu)
+            return torch.normal(mu, self._std)
 
     def default_loss(self, batch, data_parameters):
         return self.loss(batch, data_parameters, self._mseloss)
