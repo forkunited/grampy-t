@@ -421,7 +421,7 @@ class GrammarModel(nn.Module):
         elif self._arch == ArchitectureGrammar.TREE:
             z = self._arch_layers[layer_i](all_output)
 
-        if self._arch_grammar_type != GrammarType.NONE:
+        if self._arch_grammar_type == GrammarType.NONE:
             z_masked = z
         else:
             if self.on_gpu():

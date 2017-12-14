@@ -1,4 +1,4 @@
-import unittest
+import sys
 import numpy as np
 import nltk
 import torch
@@ -9,7 +9,7 @@ import mung.rule as rule
 
 from gram.model.linear import LinearRegression
 from gram.model.grammar import LinearGrammarRegression, ArchitectureGrammar
-from mung.torch_ext.eval import Loss, ModelStatistic
+from mung.torch_ext.eval import Evaluation, Loss, ModelStatistic
 from mung.torch_ext.learn import OptimizerType, Trainer
 from mung.util.log import Logger
 from mung.fol.feature_top import FeatureTopType
@@ -17,7 +17,7 @@ from mung.fol.feature_form_indicator import FeatureFormIndicatorType
 from gram.model.linear import LinearRegression, DataParameter
 from gram.model.grammar import LinearGrammarRegression, LogisticGrammarRegression, GrammarType
 
-TRAINING_ITERATIONS = 7000 #3000 #1500
+TRAINING_ITERATIONS = 20000 #3000 #1500
 DATA_SIZE = 5000
 LOG_INTERVAL = 250
 EXTEND_INTERVAL = 50
@@ -48,38 +48,39 @@ if GPU:
 torch.manual_seed(SEED)
 np.random.seed(SEED)
 
-def _make_random_proposition(self, var, num_properties, max_form_depth):
+def _make_random_proposition(var, num_properties, max_form_depth):
     if ONLY_CONJUNCTIONS:
-        return self._make_random_conjunction(var, num_properties, 2**max_form_depth)
+        return _make_random_conjunction(var, num_properties, 2**max_form_depth)
     else:
-        return self._make_random_proposition_helper(var, num_properties, max_form_depth, 0)
+        return _make_random_proposition_helper(var, num_properties, max_form_depth, 0)
 
-def _make_random_proposition_helper(self, var, num_properties, max_form_depth, cur_depth):
+def _make_random_proposition_helper(var, num_properties, max_form_depth, cur_depth):
     connective = np.random.randint(0,2)
     if connective == 0 or cur_depth == max_form_depth:
         neg = np.random.randint(0,2)
         if neg == 0:
-            return "-" + self._make_random_property(var, num_properties)
+            return "-" + _make_random_property(var, num_properties)
         else:
-            return self._make_random_property(var, num_properties)
+            return _make_random_property(var, num_properties)
     else:
-        first_prop = self._make_random_proposition_helper(var, num_properties, max_form_depth, cur_depth+1)
-        second_prop = self._make_random_proposition_helper(var, num_properties, max_form_depth, cur_depth+1)
+        first_prop = _make_random_proposition_helper(var, num_properties, max_form_depth, cur_depth+1)
+        second_prop = _make_random_proposition_helper(var, num_properties, max_form_depth, cur_depth+1)
         connective_type = np.random.randint(0,2)
         if connective_type == 0:
             return "(" + first_prop + " & " + second_prop + ")" # FIXME
         else:
             return "(" + first_prop + " & " + second_prop + ")"
 
-def _make_random_conjunction(self, var, num_properties, max_conjuncts, min_conjuncts=2):
+def _make_random_conjunction(var, num_properties, max_conjuncts, min_conjuncts=2):
     conj_n = np.random.randint(min_conjuncts, max_conjuncts+1)
     conj_indices = np.random.choice(np.arange(0, num_properties), size=conj_n, replace=False)
     negs = ["-" if np.random.randint(0,2) == 1 else "" for i in range(conj_n)]
     conjs = [negs[i] + "P" + str(conj_indices[i]) + "(" + var + ")" for i in range(conj_n)]
     return " & ".join(conjs)
 
-def _make_random_property(self, var, max_property_n):
+def _make_random_property(var, max_property_n):
     return "P" + str(np.random.randint(0,high=max_property_n)) + "(" + var + ")"
+
 
 data_parameters = DataParameter("input", "output")
 
@@ -105,7 +106,7 @@ for i in range(PROPERTIES_N):
     w.append(0.0) #.1*2.0**i)
 
 for i in range(NUM_COMPLEX_FORMS):
-    random_exp_str = self._make_random_proposition("x", PROPERTIES_N, MAX_FORM_DEPTH)
+    random_exp_str = _make_random_proposition("x", PROPERTIES_N, MAX_FORM_DEPTH)
     form = data.OpenFormula(DOMAIN, random_exp_str, ["x"])
     init_size = F_relevant.get_size()
     F_relevant.add_feature_type(FeatureFormIndicatorType("C"+str(i), form))
@@ -145,7 +146,7 @@ D_dev = feat.MultiviewDataSet(data=D_unfeat_dev, dfmats={ data_parameters[DataPa
 
 M_test_x = feat.DataFeatureMatrix(D_unfeat_test, F_0)
 M_test_y = feat.DataFeatureMatrix(D_unfeat_test, F_label)
-D_test = feat.MultiviewDataSet(data=D_unfeat_test, dfmats={ data_parameters[DataParameter.INPUT] : M_dev_x, data_parameters[DataParameter.OUTPUT] : M_test_y })
+D_test = feat.MultiviewDataSet(data=D_unfeat_test, dfmats={ data_parameters[DataParameter.INPUT] : M_test_x, data_parameters[DataParameter.OUTPUT] : M_test_y })
 
 record_prefix = dict()
 record_prefix["forms"] = NUM_COMPLEX_FORMS
@@ -162,13 +163,13 @@ for i in range(RERUNS):
     other_evaluations = []
     if ARCH_TYPE == ArchitectureGrammar.LAYER:
         # FIXME Broken for now
-        #modell1 = LinearGrammarRegression("arch_layer_gramression", [D_train_0, D_dev_0], F_0.get_size(), F_0.get_size(), R, GRAMMAR_T, bias=True, arch=ARCH_TYPE, arch_depth=MAX_FORM_DEPTH, arch_width=1, \
+        #modell1 = LinearGrammarRegression("arch_layer_gramression", [D_train, D_dev], F_0.get_size(), F_0.get_size(), R, GRAMMAR_T, bias=True, arch=ARCH_TYPE, arch_depth=MAX_FORM_DEPTH, arch_width=1, \
         #                                  reset_opt=RESET_OPTIMIZER, extend_interval=EXTEND_INTERVAL, arch_grammar_type=GRAMMAR_TYPE)
         raise ValueError
     elif ARCH_TYPE == ArchitectureGrammar.TREE:
-        modell1 = LinearGrammarRegression("arch_tree_gramression", [D_train_0, D_dev_0], F_0.get_size(), F_0.get_size(), R, GRAMMAR_T, bias=True, arch=ARCH_TYPE, arch_depth=MAX_FORM_DEPTH, arch_width=1, \
+        modell1 = LinearGrammarRegression("arch_tree_gramression", [D_train, D_dev], F_0.get_size(), F_0.get_size(), R, GRAMMAR_T, bias=True, arch=ARCH_TYPE, arch_depth=MAX_FORM_DEPTH, arch_width=1, \
                                           reset_opt=RESET_OPTIMIZER, extend_interval=EXTEND_INTERVAL, arch_grammar_type=GRAMMAR_TYPE)
-        other_evaluations = [ModelStatistic("nzf", D_dev, data_parameters, lambda m : m.get_nonzero_tree_features(F_train))]
+        other_evaluations = [ModelStatistic("nzf", D_dev, data_parameters, lambda m : len(m.get_nonzero_tree_features(D_train[data_parameters[DataParameter.INPUT]].get_feature_set())[0]))]
     elif ARCH_TYPE == ArchitectureGrammar.NONE:
         modell1 = LinearRegression("linear_regression", F_0.get_size(), bias=True)
         other_evaluations = [ModelStatistic("nzf", D_dev, data_parameters, lambda m : 0.0)]
@@ -187,41 +188,43 @@ for i in range(RERUNS):
         modell1 = modell1.cuda()
         loss_criterion = loss_criterion.cuda()
 
-    dev_loss = Loss("loss", D_dev, data_parameters, loss_criterion)
+    dev_loss = Loss("dev-loss", D_dev, data_parameters, loss_criterion)
     trainer = Trainer(data_parameters, loss_criterion, logger, \
         dev_loss, other_evaluations=other_evaluations)
     modell1, best_place_holder, best_iteration = trainer.train(modell1, D_train, TRAINING_ITERATIONS, \
         batch_size=BATCH_SIZE, optimizer_type=OptimizerType.ADAGRAD_MUNG, lr=LEARNING_RATE, \
         grad_clip=5.0, log_interval=LOG_INTERVAL, best_part_fn=lambda m : torch.ones(1), l1_C=L1_C)
 
-    logger.dump(file_path=OUTPUT_RESULTS_PATH, record_prefix=record_prefix)
+    logger.dump(file_path=OUTPUT_RESULTS_PATH + "_" + str(i), record_prefix=record_prefix)
 
-    train_loss = Loss("loss", D_test, data_parameters, loss_criterion)
-    test_loss = Loss("loss", D_test, data_parameters, loss_criterion)
+    train_loss = Loss("train-loss", D_train, data_parameters, loss_criterion)
+    test_loss = Loss("test-loss", D_test, data_parameters, loss_criterion)
     final_evals = [train_loss, dev_loss, test_loss]
-    final_evals.append(other_evaluations)
+    final_evals.append(other_evaluations[0])
 
     results = Evaluation.run_all(final_evals, modell1)
     final_logger.log(results)
-    final_logger.dump(file_path=FINAL_OUTPUT_RESULTS_PATH, record_prefix=record_prefix)
+    final_logger.dump(file_path=FINAL_OUTPUT_RESULTS_PATH + "_" + str(i), record_prefix=record_prefix)
 
     print "Finished training run " + str(i)
-    print "True model"
-    w_true = model_true.get_weights()
-    for i in range(F_relevant.get_size()):
-        print str(F_relevant.get_feature_token(i)) + "\t" + str(w_true[i])
-    print "\n"
-
-    print "Trained model"
-    w_model = modell1.get_weights()
-    F_train = D_train[data_parameters[DataParameter.INPUT]].get_feature_set()
-    print "Bias: " + str(modell1.get_bias())
-    if arch_type == ArchitectureGrammar.LAYER:
-        for i in range(F_train.get_size()):
-            print str(F_train.get_feature_token(i)) + "\t" + str(w_model[i])
+    if ARCH_TYPE != ArchitectureGrammar.NONE:
+        print "True model"
+        w_true = model_true.get_weights()
+        for i in range(F_relevant.get_size()):
+            print str(F_relevant.get_feature_token(i)) + "\t" + str(w_true[i])
         print "\n"
-    else:
-        nz_feats, nz_weights = modell1.get_nonzero_tree_features(F_train)
-        for i in range(len(nz_feats)):
-            f = nz_feats[i]
-            print f.get_str(weighted=False) + "\t" + str(nz_weights[i])
+
+        print "Trained model"
+        w_model = modell1.get_weights()
+        F_train = D_train[data_parameters[DataParameter.INPUT]].get_feature_set()
+        print "Bias: " + str(modell1.get_bias())
+        if ARCH_TYPE == ArchitectureGrammar.LAYER:
+            for i in range(F_train.get_size()):
+                print str(F_train.get_feature_token(i)) + "\t" + str(w_model[i])
+            print "\n"
+        else:
+            nz_feats, nz_weights = modell1.get_nonzero_tree_features(F_train)
+            for i in range(len(nz_feats)):
+                f = nz_feats[i]
+                print f.get_str(weighted=False) + "\t" + str(nz_weights[i])
+
