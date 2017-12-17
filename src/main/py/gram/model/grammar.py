@@ -225,6 +225,13 @@ class GrammarModel(nn.Module):
 
         return Variable(mask.repeat(1,self._arch_width))
 
+    def get_nonzero_weight_count(self):
+        nz = torch.nonzero(self._linear.weight.data.view(-1))
+        if len(nz.size()) == 0:
+            return 0
+        else:
+            return nz.size(0)
+
     def set_optimizer(self, opt):
         self._opt = opt
 

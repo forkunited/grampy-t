@@ -172,7 +172,7 @@ for i in range(RERUNS):
         other_evaluations = [ModelStatistic("nzf", D_dev, data_parameters, lambda m : len(m.get_nonzero_tree_features(D_train[data_parameters[DataParameter.INPUT]].get_feature_set())[0]))]
     elif ARCH_TYPE == ArchitectureGrammar.NONE:
         modell1 = LinearRegression("linear_regression", F_0.get_size(), bias=True)
-        other_evaluations = [ModelStatistic("nzf", D_dev, data_parameters, lambda m : 0.0)]
+        other_evaluations = [ModelStatistic("nzf", D_dev, data_parameters, lambda m : m.get_nonzero_weight_count())]
 
     record_prefix["run"] = i
     logger = Logger()

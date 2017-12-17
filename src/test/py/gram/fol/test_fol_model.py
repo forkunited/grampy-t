@@ -6,7 +6,7 @@ import torch
 import mung.fol.data as data
 import mung.feature as feat
 import mung.rule as rule
-from mung.torch_ext.eval import Loss
+from mung.torch_ext.eval import Loss, ModelStatistic
 from mung.torch_ext.learn import OptimizerType, Trainer
 from mung.util.log import Logger
 from mung.fol.rule_form_indicator import BinaryRule
@@ -16,13 +16,14 @@ from mung.fol.feature_form_indicator import FeatureFormIndicatorType
 from gram.model.linear import LinearRegression, LogisticRegression, DataParameter
 from gram.model.grammar import LinearGrammarRegression, LogisticGrammarRegression
 
-TRAINING_ITERATIONS = 750 #1500
+TRAINING_ITERATIONS = 1000 #1500
 DATA_SIZE = 3000
-LOG_INTERVAL = 5
-BATCH_SIZE = 100
-GRAMMAR_T = 0.05
-L1_C = 0.4
+LOG_INTERVAL = 1
+BATCH_SIZE = 50
+GRAMMAR_T = 0.0
+L1_C = 0.25
 LEARNING_RATE = 1.0
+STD = 0.1
 
 # FIXME Add back if using gpus
 #if gpu:
@@ -89,7 +90,7 @@ class TestFOLModel(unittest.TestCase):
         w_params = torch.FloatTensor(w)
         model_true = None
         if model_type == ModelType.LINEAR_REGRESSION or model_type == ModelType.LINEMAR_GRAMRESSION:
-            model_true = LinearRegression("linear_true", w_params.size(0), init_params=w_params)
+            model_true = LinearRegression("linear_true", w_params.size(0), init_params=w_params, std=STD)
         else:
             model_true = LogisticRegression("logistic_true", w_params.size(0), init_params=w_params)
 
@@ -126,28 +127,33 @@ class TestFOLModel(unittest.TestCase):
         modell1 = None
         D_train = None
         D_dev = None
+        other_evaluations=[]
         if model_type == ModelType.LINEAR_REGRESSION:
             modell1 = LinearRegression("linear_regression", F_full.get_size(), bias=True)
             D_train = D_train_full
             D_dev = D_dev_full
+            other_evaluations=[ModelStatistic("nzf", D_dev, data_parameters, lambda m : m.get_nonzero_weight_count())]
         elif model_type == ModelType.LOGISTIC_REGRESSION:
             modell1 = LogisticRegression("logistic_regression", F_full.get_size(), bias=True)
             D_train = D_train_full
             D_dev = D_dev_full
+            other_evaluations=[ModelStatistic("nzf", D_dev, data_parameters, lambda m : m.get_nonzero_weight_count())]
         elif model_type == ModelType.LINEMAR_GRAMRESSION:
             modell1 = LinearGrammarRegression("linemar_gramression", [D_train_0, D_dev_0], F_0.get_size(), F_full.get_size(), R, GRAMMAR_T, bias=True, max_expand_unary=None, max_expand_binary=None)
             D_train = D_train_0
             D_dev = D_dev_0
+            other_evaluations=[ModelStatistic("nzf", D_dev, data_parameters, lambda m : m.get_nonzero_weight_count())]
         elif model_type == ModelType.LOGISTMAR_GRAMRESSION:
             modell1 = LogisticGrammarRegression("logistmar_gramression", [D_train_0, D_dev_0], F_0.get_size(), F_full.get_size(), R, GRAMMAR_T, bias=True, max_expand_unary=None, max_expand_binary=None)
             D_train = D_train_0
             D_dev = D_dev_0
+            other_evaluations=[ModelStatistic("nzf", D_dev, data_parameters, lambda m : m.get_nonzero_weight_count())]
 
         logger = Logger()
         loss_criterion = modell1.get_loss_criterion()
         dev_loss = Loss("loss", D_dev, data_parameters, loss_criterion)
         trainer = Trainer(data_parameters, loss_criterion, logger, \
-            dev_loss, other_evaluations=[])
+            dev_loss, other_evaluations=other_evaluations)
         modell1, best_meaning, best_iteration = trainer.train(modell1, D_train, TRAINING_ITERATIONS, \
             batch_size=BATCH_SIZE, optimizer_type=OptimizerType.ADAGRAD_MUNG, lr=lr, \
             grad_clip=5.0, log_interval=LOG_INTERVAL, best_part_fn=None, l1_C=l1_C)
@@ -169,7 +175,7 @@ class TestFOLModel(unittest.TestCase):
         logger.set_file_path("out_" + str(model_type) + ".tsv")
         logger.dump()
 
-    """
+
     def test_linear(self):
         print "Linear regression..."
         self._test_model(ModelType.LINEAR_REGRESSION, lr=LEARNING_RATE, l1_C=L1_C)
@@ -185,6 +191,6 @@ class TestFOLModel(unittest.TestCase):
     def test_logistic_g(self):
         print "Logistmar gramression..."
         self._test_model(ModelType.LOGISTMAR_GRAMRESSION, lr=LEARNING_RATE, l1_C=L1_C)
-
+    """
 if __name__ == '__main__':
     unittest.main()

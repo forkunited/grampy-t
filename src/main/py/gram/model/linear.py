@@ -50,6 +50,14 @@ class LinearModel(nn.Module):
     def get_weights(self):
         return list((list(self.parameters()))[0].data.view(-1))
 
+    def get_nonzero_weight_count(self):
+        nz = torch.nonzero((list(self.parameters()))[0].data.view(-1))
+        if len(nz.size()) == 0:
+            return 0
+        else:
+            return nz.size(0)
+
+
     def get_bias(self):
         return list(self.parameters())[1].data[0]
 
